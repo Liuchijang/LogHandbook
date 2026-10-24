@@ -1,0 +1,9 @@
+{
+  "name": "log-handbook",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static bilingual security log reference handbook",
+  "scripts": {
+    "validate": "node validate.js"
+  }
+}
