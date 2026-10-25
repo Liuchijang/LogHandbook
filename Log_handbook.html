@@ -96,7 +96,8 @@ aside a span{font-family:var(--font-mono);font-size:.75rem;color:var(--muted)}
 .bhead h2{font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.03em;font-size:1.05rem;margin:0 0 2px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .tick{width:9px;height:9px;background:var(--brand);flex:0 0 auto;display:inline-block}
 .bhead h2 small{font-family:var(--font-sans);text-transform:none;letter-spacing:0;font-weight:500;color:var(--muted);font-size:.85rem}
-.bpath{font-family:var(--font-mono);font-size:.8rem;font-weight:600;color:var(--ink);word-break:break-all;margin:8px 0 0;display:inline-block;background:var(--surface-alt);border:1px solid var(--line);border-radius:var(--r-sm);padding:4px 9px}
+.bpaths{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.bpath{font-family:var(--font-mono);font-size:.8rem;font-weight:600;color:var(--ink);word-break:break-all;display:inline-block;background:var(--surface-alt);border:1px solid var(--line);border-radius:var(--r-sm);padding:4px 9px}
 .bnote{color:var(--muted);font-size:.9rem;margin:6px 0 0;max-width:75ch}
 .refs{color:var(--muted);font-size:.78rem;margin:8px 0 0}
 .refs a{color:var(--muted);text-decoration:underline;text-underline-offset:2px}
@@ -217,6 +218,12 @@ function el(tag, attrs={}, ...kids){
   }
   for (const k of kids) if (k!=null) e.append(k);
   return e;
+}
+function pathChips(text){
+  const parts = (text||"").split(";").map(s=>s.trim()).filter(Boolean);
+  const wrap = el("div",{class:"bpaths"});
+  (parts.length ? parts : [text||""]).forEach(p=> wrap.append(el("span",{class:"bpath",text:p})));
+  return wrap;
 }
 function codeBlock(text){
   const box = el("div",{class:"code"});
@@ -342,7 +349,7 @@ function render(){
     }
     const block = el("section",{class:"block",id:"s-"+src});
     const h2 = el("h2",{}, el("span",{class:"tick","aria-hidden":"true"}), name, el("small",{text:GROUPS.find(x=>x.k===g).label}));
-    const bh = el("div",{class:"bhead"}, h2, el("p",{class:"bpath",text:srcPath(src)}), note? el("p",{class:"bnote",text:note}) : null);
+    const bh = el("div",{class:"bhead"}, h2, pathChips(srcPath(src)), note? el("p",{class:"bnote",text:note}) : null);
     if (meta[3]){ const d = el("div",{class:"bq"}); d.append(codeBlock(meta[3])); bh.append(d); }
     const refs = SRC_REFS[src];
     if (refs && refs.length){
