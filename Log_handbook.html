@@ -59,7 +59,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 ::selection{background:var(--hl-bg);color:var(--hl-ink)}
 mark{background:var(--hl-bg);color:var(--hl-ink);border-radius:var(--r-xs)}
 ::placeholder{color:var(--muted);opacity:1}
-.wrap{max-width:73.75rem;margin:0 auto;padding:0 1.25rem}
+/* Fill the window; the cap only guards ultra-wide screens. Prose keeps its own ch limits. */
+.wrap{max-width:160rem;margin:0 auto;padding:0 clamp(1.25rem,2.5vw,3rem)}
 code,pre,.mono{font-family:var(--font-mono)}
 
 /* theme toggle */
@@ -106,7 +107,7 @@ h1{font-family:var(--font-mono);text-transform:uppercase;font-size:1.15rem;line-
 button:focus-visible,a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 
 /* layout */
-.layout{display:grid;grid-template-columns:12.5rem minmax(0,1fr);gap:2rem;padding-top:1.5rem;padding-bottom:3.75rem}
+.layout{display:grid;grid-template-columns:clamp(12.5rem,16vw,20rem) minmax(0,1fr);gap:clamp(2rem,2.5vw,3rem);padding-top:1.5rem;padding-bottom:3.75rem}
 main{min-width:0}
 aside{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdr) + .75rem);align-self:start;max-height:calc(100vh - var(--hdr) - 1.5rem);max-height:calc(100dvh - env(safe-area-inset-top,0px) - var(--hdr) - 1.5rem);overflow:auto;overscroll-behavior:contain}
 aside .grp{font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.04em;font-size:.72rem;color:var(--muted);margin:16px 0 4px;font-weight:600}
