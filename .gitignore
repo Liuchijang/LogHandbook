@@ -1,1 +1,4 @@
 CLAUDE.md
+
+# Real log exports (contain production data, never commit)
+raw_samples_*.csv
