@@ -505,12 +505,23 @@ function scrollToNode(node){
 function openFromHash(){
   const h = decodeURIComponent(location.hash.slice(1));
   if (!h.startsWith("r-")) return;
-  const r = ROWS.find(x=>"r-"+x.key===h);
+  let r = ROWS.find(x=>"r-"+x.key===h);
+  // Links made before a source was split (#r-esx-ev-<id>) resolve to the entry under its new source key.
+  if (!r && typeof SRC_ALIAS !== "undefined"){
+    for (const [old, news] of Object.entries(SRC_ALIAS)){
+      const p = "r-"+slug(old)+"-";
+      if (!h.startsWith(p)) continue;
+      const rest = h.slice(p.length);
+      r = ROWS.find(x=>news.includes(x.src) && x.key===slug(x.src)+"-"+rest);
+      if (r) break;
+    }
+    if (r){ try{ history.replaceState(null, "", location.pathname + location.search + "#r-" + r.key); }catch(_){} }
+  }
   if (!r) return;
   if (!filtered().includes(r)){ state.g="all"; state.sev=new Set(ALL_SEV); state.q=""; $("#q").value=""; }
   state.open.add(r.i);
   refresh(true);
-  const art = document.getElementById(h);
+  const art = document.getElementById("r-"+r.key);
   if (art){ scrollToNode(art); art.querySelector(".rh").focus({preventScroll:true}); }
 }
 function goToRow(r){

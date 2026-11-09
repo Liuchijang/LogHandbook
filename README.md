@@ -4,7 +4,7 @@ Bilingual (VI/EN) security log reference handbook for threat hunters — quickly
 
 **Live:** https://liuchijang.github.io/LogHandbook/
 
-Covers these log source groups: Windows, Linux, Access log, Kubernetes, vCenter, ESXi. Each entry includes: description, fields to know, sample log, lookup command, references, and ATT&CK link (where applicable).
+Covers these log source groups: Windows, Linux, vCenter, ESXi, Kubernetes, Access log, F5 BIG-IP, AWS. Within each group, sources are split by function (e.g. ESXi access, system, storage; vCenter SSO, API, appliance OS). Each entry includes: description, fields to know, sample log, lookup command, references, and ATT&CK link (where applicable).
 
 ## Structure
 
